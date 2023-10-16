@@ -1,0 +1,64 @@
+name: CICD
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  unit_test_and_coverage:
+    name: Unit tests and coverage
+    runs-on: ubuntu-latest
+    permissions: read-all
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.8.0
+    - name: Install dependencies
+      working-directory: ./src
+      run: npm install
+    - name: Test coverage
+      working-directory: ./src
+      run: npm run test:coverage
+    - name: Cache coverage lcov.info
+      uses: actions/cache@v2
+      with:
+        path: .tap/report/lcov.info
+        key: ${{ runner.os }}-coverage-${{ hashFiles('**/package-lock.json') }}
+  static_code_analysis:
+    name: Static code analysis
+    needs: unit_test_and_coverage
+    runs-on: ubuntu-latest
+    permissions: read-all
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Restore coverage lcov.info from cache
+      uses: actions/cache@v2
+      with:
+        path: .tap/report/lcov.info
+        key: ${{ runner.os }}-coverage-${{ hashFiles('**/package-lock.json') }}
+    - uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  security_fs_scan:
+    name: Security fs scan
+    runs-on: ubuntu-latest
+    permissions: read-all
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Run Trivy vulnerability scanner in fs mode
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        format: sarif
+        output: trivy-results.sarif
+    - name: Upload Trivy results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v1
+      with:
+        sarif_file: trivy-results.sarif
