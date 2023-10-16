@@ -47,7 +47,7 @@ jobs:
   security_fs_scan:
     name: Security fs scan
     runs-on: ubuntu-latest
-    permissions: read-all
+    permissions: write-all
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
